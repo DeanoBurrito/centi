@@ -1,5 +1,5 @@
 TARGET = $(BUILD_DIR)/centi
-CXX_FLAGS = -g -Og -fno-exceptions -fno-rtti -Iinclude -Iinclude/sl
+CXX_FLAGS = -g -Og -fno-exceptions -fno-rtti -Iinclude -Iinclude/sl -Wall -Wextra
 CXX_SRCS = src/Main.cpp src/NanoPrintf.cpp src/HostLinux.cpp \
 	src/editor/Buffer.cpp src/editor/Editor.cpp \
 	src/editor/Command.cpp src/editor/BuiltinCommands.cpp

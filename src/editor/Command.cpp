@@ -45,6 +45,7 @@ namespace Centi::Editor
         if (!maybeInput.HasValue())
             return;
 
+        editor->RedrawMessageBar();
         if (*maybeInput == '\e')
         {
             Mode(InputMode::Normal);
@@ -54,6 +55,7 @@ namespace Centi::Editor
 
         //TODO: we should normalize the input chars
         inputBuffer[inputLength++] = *maybeInput;
+
         size_t leadingDigits = 0;
         while (leadingDigits < inputLength && isdigit(inputBuffer[leadingDigits]))
             leadingDigits++;
@@ -95,7 +97,6 @@ namespace Centi::Editor
                 cmdInputLength++;
                 break;
             }
-            editor->RedrawMessageBar();
             inputLength = 0;
         }
     }

@@ -8,8 +8,6 @@ namespace Centi::Editor
 {
     bool Editor::UpdateDisplaySpec()
     {
-        constexpr size_t MaxReplyLength = 32;
-
         if (!HostGetTerminalSize(displaySize.x, displaySize.y))
             return false;
 
@@ -125,7 +123,7 @@ namespace Centi::Editor
             RenderWindow(win);
         }
 
-        if (redrawMessageBar);
+        if (redrawMessageBar)
         {
             redrawMessageBar = false;
             RenderMessageBar();

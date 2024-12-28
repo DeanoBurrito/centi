@@ -27,18 +27,18 @@ namespace Centi::Editor
 
     struct BindingHandler
     {
-        sl::ListHook listHook;
+        sl::ListHook listHook {};
 
         BindingCallback callback;
         char tag[MaxBindingTagLength];
-        char tagLength;
+        unsigned char tagLength;
     };
 
     using CommandResponseCallback = size_t (*)(Editor& editor, sl::StringSpan args, void* opaque);
 
     struct CommandHandler
     {
-        sl::ListHook listHook;
+        sl::ListHook listHook {};
 
         CommandResponseCallback callback;
         void* opaque;

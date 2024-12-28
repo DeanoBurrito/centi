@@ -8,6 +8,7 @@ int main(int argc, const char** argv)
     if (!HostSetupTerminal())
         return 1;
 
+    (void)argc; (void)argv; //TODO: argument parsing
     Editor::Editor ed {};
     ed.Run();
 
