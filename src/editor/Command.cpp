@@ -52,18 +52,24 @@ namespace Centi::Editor
             return;
         }
 
-        inputBuffer[inputLength++] = *maybeInput;
         //TODO: we should normalize the input chars
+        inputBuffer[inputLength++] = *maybeInput;
+        size_t leadingDigits = 0;
+        while (leadingDigits < inputLength && isdigit(inputBuffer[leadingDigits]))
+            leadingDigits++;
+        const size_t realInputLength = inputLength - leadingDigits;
 
         auto& scanList = bindings[static_cast<size_t>(mode)];
         for (auto it = scanList.Begin(); it != scanList.End(); ++it)
         {
-            if (inputLength != it->tagLength)
+            if (realInputLength != it->tagLength)
                 continue;
-            if (memcmp(inputBuffer, it->tag, inputLength) != 0)
+            if (memcmp(inputBuffer + leadingDigits, it->tag, realInputLength) != 0)
                 continue;
 
-            it->callback(*editor);
+            const size_t repeatCount = sl::Max(1ull, strtoull(inputBuffer, nullptr, 0));
+            for (size_t i = 0; i < repeatCount; i++)
+                it->callback(*editor);
             inputLength = 0;
             return;
         }

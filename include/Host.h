@@ -13,6 +13,7 @@ extern "C"
     void* memmove(void* dest, const void* src, size_t count);
 
     unsigned long long strtoull(const char* str, char** str_end, int base);
+    int isdigit(int arg);
 }
 
 namespace Centi
