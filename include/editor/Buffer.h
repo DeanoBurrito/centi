@@ -3,6 +3,8 @@
 #include <Types.h>
 #include <sl/List.h>
 #include <RefCount.h>
+#include <Vectors.h>
+#include <Span.h>
 
 namespace Centi::Editor
 {
@@ -25,7 +27,11 @@ namespace Centi::Editor
     struct BufferSegment
     {
         sl::ListHook rowHook;
-        TextChar text[BufferSegmentLength];
+        union
+        {
+            size_t count;
+            TextChar text[BufferSegmentLength];
+        };
     };
 
     struct BufferRow
@@ -38,15 +44,20 @@ namespace Centi::Editor
 
     struct Buffer
     {
+        sl::ListHook listHook;
         sl::RefCount refCount;
         sl::List<BufferRow, &BufferRow::rowsListHook> rows;
         size_t id;
+        bool writable;
+        bool dirty;
     };
 
     void CleanupBuffer(Buffer* buffer);
 
     using BufferRef = sl::Ref<Buffer, &Buffer::refCount, CleanupBuffer>;
 
-    BufferRef CreateBuffer();
-    bool DestroyBuffer(Buffer* buffer, bool force);
+    BufferRef CreateBuffer(sl::StringSpan initContent, bool writable);
+    bool DestroyBuffer(BufferRef buffer, bool force);
+
+    size_t ReadBuffer(BufferRef buffer, sl::Vector2u offset, sl::Span<char> into);
 }
