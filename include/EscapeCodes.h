@@ -1,0 +1,29 @@
+#pragma once
+
+#define CSI_INDUCER "\e["
+
+#define CSI_ERASE_FROM_CURSOR 0
+#define CSI_ERASE_TO_CURSOR 1
+#define CSI_ERASE_EVERYTHING 2
+
+#define CSI_CURSOR_UP_(n) CSI_INDUCER n "A"
+#define CSI_CURSOR_DOWN_(n) CSI_INDUCER n "B"
+#define CSI_CURSOR_RIGHT_(n) CSI_INDUCER n "C"
+#define CSI_CURSOR_LEFT_(n) CSI_INDUCER n "D"
+#define CSI_CURSOR_DOWN_LINE_(n) CSI_INDUCER n "E"
+#define CSI_CURSOR_UP_LINE_(n) CSI_INDUCER n "F"
+#define CSI_CURSOR_SET_X_(n) CSI_INDUCER n "G"
+#define CSI_CURSOR_SET_POS_(x, y) CSI_INDUCER y ";" x "H"
+#define CSI_ERASE_(n) CSI_INDUCER n "J"
+#define CSI_ERASE_LINE_(n) CSI_INDUCER n "K"
+
+#define CSI_CURSOR_UP(n) CSI_CURSOR_UP_(#n)
+#define CSI_CURSOR_DOWN(n) CSI_CURSOR_DOWN_(#n)
+#define CSI_CURSOR_RIGHT(n) CSI_CURSOR_RIGHT_(#n)
+#define CSI_CURSOR_LEFT(n) CSI_CURSOR_LEFT_(#n)
+#define CSI_CURSOR_DOWN_LINE(n) CSI_CURSOR_DOWN_LINE_(#n)
+#define CSI_CURSOR_UP_LINE(n) CSI_CURSOR_UP_LINE_(#n)
+#define CSI_CURSOR_SET_X(n) CSI_CURSOR_SET_X_(#n)
+#define CSI_CURSOR_SET_POS(x, y) CSI_CURSOR_SET_POS_(#x, #y)
+#define CSI_ERASE(n) CSI_ERASE_(#n)
+#define CSI_ERASE_LINE(n) CSI_ERASE_LINE_(#n)
