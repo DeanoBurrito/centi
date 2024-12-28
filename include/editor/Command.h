@@ -8,6 +8,7 @@
 namespace Centi::Editor
 {
     constexpr size_t MaxBindingTagLength = 7;
+    constexpr size_t MaxCommandLength = 128;
 
     enum class InputMode
     {
@@ -33,7 +34,7 @@ namespace Centi::Editor
         char tagLength;
     };
 
-    using CommandResponseCallback = size_t (*)(Editor& editor, EditorWindow* window, sl::StringSpan args, void* opaque);
+    using CommandResponseCallback = size_t (*)(Editor& editor, sl::StringSpan args, void* opaque);
 
     struct CommandHandler
     {
@@ -44,7 +45,7 @@ namespace Centi::Editor
         sl::StringSpan tag;
     };
 
-    class CommandProcessor
+    class CommandEngine
     {
     private:
         Editor* editor;
@@ -54,6 +55,8 @@ namespace Centi::Editor
         InputMode mode = InputMode::Normal;
         char inputBuffer[MaxBindingTagLength];
         size_t inputLength = 0;
+        char cmdInputBuffer[MaxCommandLength + 1];
+        size_t cmdInputLength = 0;
 
     public:
         inline void BindEditor(Editor& ed)
@@ -66,6 +69,7 @@ namespace Centi::Editor
         void Process();
         void DoCommand(sl::StringSpan command);
         size_t PeekInputBuffer(sl::Span<char> buffer) const;
+        sl::StringSpan PeekCommandBuffer() const;
         InputMode Mode(sl::Opt<InputMode> set = {});
     };
 }

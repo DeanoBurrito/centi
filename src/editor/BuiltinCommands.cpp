@@ -57,14 +57,33 @@ namespace Centi::Editor
 
     BindingHandler builtinBindsVisual[] =
     {
+        {
+            .callback = [](Editor& editor) { editor.MoveCursor(MoveDirection::Up, 1); },
+            .tag = "k",
+            .tagLength = 1
+        },
+        {
+            .callback = [](Editor& editor) { editor.MoveCursor(MoveDirection::Down, 1); },
+            .tag = "j",
+            .tagLength = 1
+        },
+        {
+            .callback = [](Editor& editor) { editor.MoveCursor(MoveDirection::Left, 1); },
+            .tag = "h",
+            .tagLength = 1
+        },
+        {
+            .callback = [](Editor& editor) { editor.MoveCursor(MoveDirection::Right, 1); },
+            .tag = "l",
+            .tagLength = 1
+        },
     };
 
     CommandHandler builtinCommands[] =
     {
         {
-            .callback = [](Editor& editor, EditorWindow* window, sl::StringSpan args, void* opaque) -> size_t
+            .callback = [](Editor& editor, sl::StringSpan args, void* opaque) -> size_t
             {
-                (void)window;
                 (void)args;
                 (void)opaque;
 
@@ -74,9 +93,19 @@ namespace Centi::Editor
             .opaque = nullptr,
             .tag = "quit",
         },
+        {
+            .callback = [](Editor& editor, sl::StringSpan args, void* opaque) -> size_t
+            {
+                (void)args;
+                (void)opaque;
+                return 0;
+            },
+            .opaque = nullptr,
+            .tag = "edit",
+        },
     };
 
-    void CommandProcessor::AddBuiltins()
+    void CommandEngine::AddBuiltins()
     {
         constexpr size_t normalCount = sizeof(builtinBindsNormal) / sizeof(BindingHandler);
         for (size_t i = 0; i < normalCount; i++)

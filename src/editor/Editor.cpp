@@ -32,32 +32,40 @@ namespace Centi::Editor
 
     void Editor::RenderMessageBar()
     {
-        constexpr const char FormatStr[] = "\e[%lu;1H\e[2K%s %s\e[%luG%.*s";
-        constexpr const char FormatStr2[] = CSI_CURSOR_SET_POS_("1", "%lu") CSI_ERASE_LINE(2) "%s %s" CSI_CURSOR_SET_X_("%lu") "%.*s";
+        constexpr const char FormatStr[] = CSI_CURSOR_SET_POS_("1", "%lu") 
+            CSI_ERASE_LINE(2) "%s %.*s" CSI_CURSOR_SET_X_("%lu") "%.*s";
 
-        const char* modeStr = [](InputMode m)
+        sl::StringSpan msgStr = logs.Empty() ? sl::StringSpan() : logs.Front().text;
+        const char* modeStr;
+
+        switch (Mode())
         {
-            switch (m)
-            {
-            case InputMode::Normal: return "NORMAL";
-            case InputMode::Insert: return "INSERT";
-            case InputMode::Command: return "COMMAND";
-            case InputMode::Visual: return "VISUAL";
-            default: return "WTF?!";
-            }
-        }(Mode());
+        case InputMode::Normal:
+            modeStr = "NORMAL";
+            break;
+        case InputMode::Insert:
+            modeStr = "INSERT";
+            break;
+        case InputMode::Command:
+            modeStr = "COMMAND";
+            msgStr = cmdEngine.PeekCommandBuffer();
+            break;
+        case InputMode::Visual:
+            modeStr = "VISUAL";
+            break;
 
-        const char* msgStr = "";
-        if (!logs.Empty())
-            msgStr = logs.Front().text.Begin();
+        default:
+            modeStr = "WTF?!";
+            break;
+        }
 
         char inputBuffer[MaxBindingTagLength];
-        const size_t inputLen = cmdProcessor.PeekInputBuffer(inputBuffer);
+        const size_t inputLen = cmdEngine.PeekInputBuffer(inputBuffer);
 
         char buffer[MaxRowRenderLength];
         const size_t writtenLen = npf_snprintf(buffer, MaxRowRenderLength, 
-            FormatStr, displaySize.y, modeStr, msgStr, displaySize.x - 
-            MaxBindingTagLength * 2, (int)inputLen, inputBuffer);
+            FormatStr, displaySize.y, modeStr, (int)msgStr.Size(), msgStr.Begin(), 
+            displaySize.x - MaxBindingTagLength * 2, (int)inputLen, inputBuffer);
 
         HostPutChars({ buffer, writtenLen });
     }
@@ -70,10 +78,26 @@ namespace Centi::Editor
         char lineBuff[MaxRowRenderLength];
         size_t lineBuffLen = 0;
 
-        HostPutChars(CSI_CURSOR_SET_POS(1, 1));
-        HostPutChars("~");
-        for (size_t i = 1; i < window->size.y - 1; i++)
-            HostPutChars(CSI_CURSOR_DOWN_LINE(1)"~");
+        if (window->dirty.scroll)
+        {
+            constexpr const char HeaderStr[] = CSI_CURSOR_SET_POS_("%lu", "%lu") CSI_ERASE_LINE(2);
+            window->dirty.scroll = false;
+
+            auto bufferRow = window->buffer->rows.Begin();
+            for (size_t i = 0; i < window->scroll.y; i++)
+                ++bufferRow;
+
+            for (size_t i = 0; i < window->size.y - 1; i++)
+            {
+                lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, HeaderStr, i, 0ul);
+
+                if (bufferRow == window->buffer->rows.End())
+                    lineBuff[lineBuffLen++] = '~';
+                //TODO: copy segment data (or SSO) to line buffer and render
+
+                HostPutChars({ lineBuff, lineBuffLen });
+            }
+        }
 
         if (window->dirty.cursor)
         {
@@ -83,11 +107,11 @@ namespace Centi::Editor
 
         if (window->dirty.status)
         {
-            constexpr const char FormatStr[] = CSI_CURSOR_DOWN_LINE(1) CSI_ERASE_LINE(2) "cursor %lu:%lu";
+            constexpr const char FormatStr[] = CSI_CURSOR_SET_POS_("0", "%lu") CSI_ERASE_LINE(2) "cursor %lu:%lu";
             window->dirty.status = false;
 
             lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, FormatStr,
-                window->cursor.y, window->cursor.x);
+                window->size.y, window->cursor.y, window->cursor.x);
             HostPutChars({ lineBuff, lineBuffLen });
         }
     }
@@ -100,22 +124,30 @@ namespace Centi::Editor
             win->dirty.queued = false;
             RenderWindow(win);
         }
-        RenderMessageBar();
+
+        if (redrawMessageBar);
+        {
+            redrawMessageBar = false;
+            RenderMessageBar();
+        }
     }
 
     Editor::Editor()
     {
         shouldQuit = false;
 
-        cmdProcessor.BindEditor(*this);
-        cmdProcessor.AddBuiltins();
+        cmdEngine.BindEditor(*this);
+        cmdEngine.AddBuiltins();
 
         UpdateDisplaySpec();
         
         rootWindow = focusedWindow = new EditorWindow();
+
+        rootWindow->buffer = CreateBuffer({}, true);
         rootWindow->size = displaySize;
         rootWindow->size.y--; //leave space for message bar
         rootWindow->dirty.cursor = true;
+        rootWindow->dirty.scroll = true;
         dirtyWindows.PushBack(rootWindow);
     }
 
@@ -129,7 +161,7 @@ namespace Centi::Editor
 
         while (!shouldQuit)
         {
-            cmdProcessor.Process();
+            cmdEngine.Process();
             RunWorkItems(-1);
 
             Render();
@@ -161,11 +193,14 @@ namespace Centi::Editor
             return false;
         }
 
+        va_start(args, format);
         npf_vsnprintf(buffer, finalLength + 1, format, args);
+        va_end(args);
+
         msg->text = sl::StringSpan(buffer, finalLength);
         msg->level = level;
-
         logs.PushFront(msg);
+
         return true;
     }
 
@@ -188,16 +223,16 @@ namespace Centi::Editor
         switch (dir)
         {
         case MoveDirection::Up: 
-            focusedWindow->cursor.y = sl::Clamp(focusedWindow->cursor.y - count, 0ul, focusedWindow->size.y);
+            focusedWindow->cursor.y = sl::Clamp(focusedWindow->cursor.y - count, 0ul, focusedWindow->size.y - 1);
             break;
         case MoveDirection::Down: 
-            focusedWindow->cursor.y = sl::Clamp(focusedWindow->cursor.y + count, 0ul, focusedWindow->size.y);
+            focusedWindow->cursor.y = sl::Clamp(focusedWindow->cursor.y + count, 0ul, focusedWindow->size.y - 1);
             break;
         case MoveDirection::Left: 
-            focusedWindow->cursor.x = sl::Clamp(focusedWindow->cursor.x - count, 0ul, focusedWindow->size.x);
+            focusedWindow->cursor.x = sl::Clamp(focusedWindow->cursor.x - count, 0ul, focusedWindow->size.x - 1);
             break;
         case MoveDirection::Right: 
-            focusedWindow->cursor.x = sl::Clamp(focusedWindow->cursor.x + count, 0ul, focusedWindow->size.x);
+            focusedWindow->cursor.x = sl::Clamp(focusedWindow->cursor.x + count, 0ul, focusedWindow->size.x - 1);
             break;
         }
 

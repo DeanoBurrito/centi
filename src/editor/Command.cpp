@@ -5,7 +5,7 @@
 
 namespace Centi::Editor
 {
-    bool CommandProcessor::AddBinding(InputMode mode, BindingHandler* handler)
+    bool CommandEngine::AddBinding(InputMode mode, BindingHandler* handler)
     {
         //TODO: normalize tag chars + convert keys like delete (which becomes an escape seq)
         auto& list = bindings[static_cast<size_t>(mode)];
@@ -20,7 +20,7 @@ namespace Centi::Editor
         return true;
     }
 
-    bool CommandProcessor::AddCommand(CommandHandler* handler)
+    bool CommandEngine::AddCommand(CommandHandler* handler)
     {
         //TODO: normalize tag chars + convert keys like delete (which becomes an escape seq)
         if (handler->tag[handler->tag.Size() - 1] == 0)
@@ -36,7 +36,7 @@ namespace Centi::Editor
         return true;
     }
 
-    void CommandProcessor::Process()
+    void CommandEngine::Process()
     {
         if (inputLength >= MaxBindingTagLength)
             inputLength = 0;
@@ -55,7 +55,7 @@ namespace Centi::Editor
         inputBuffer[inputLength++] = *maybeInput;
         //TODO: we should normalize the input chars
 
-        auto& scanList = bindings[static_cast<size_t>(editor->Mode())];
+        auto& scanList = bindings[static_cast<size_t>(mode)];
         for (auto it = scanList.Begin(); it != scanList.End(); ++it)
         {
             if (inputLength != it->tagLength)
@@ -65,11 +65,36 @@ namespace Centi::Editor
 
             it->callback(*editor);
             inputLength = 0;
-            break;
+            return;
+        }
+
+        if (mode == InputMode::Command)
+        {
+            if (cmdInputLength >= MaxCommandLength)
+                cmdInputLength = 0;
+
+            switch (*maybeInput)
+            {
+            case '\r':
+                Mode(InputMode::Normal);
+                DoCommand({ &cmdInputBuffer[1], cmdInputLength });
+                cmdInputLength = 0;
+                break;
+            case 0x7F:
+                if (cmdInputLength > 0)
+                    cmdInputLength--;
+                break;
+            default:
+                cmdInputBuffer[1 + cmdInputLength] = *maybeInput;
+                cmdInputLength++;
+                break;
+            }
+            editor->RedrawMessageBar();
+            inputLength = 0;
         }
     }
 
-    void CommandProcessor::DoCommand(sl::StringSpan command)
+    void CommandEngine::DoCommand(sl::StringSpan command)
     {
         if (command.Empty())
             return;
@@ -81,13 +106,19 @@ namespace Centi::Editor
             if (command != it->tag)
                 continue;
 
-            editor->LogMessage(LogLevel::Trace, "Running command %.*s", (int)command.Size(), command.Begin());
-            it->callback(*editor, nullptr, command, it->opaque);
+            editor->LogMessage(LogLevel::Trace, "Running command %.*s", (int)command.Size(), 
+                command.Begin());
+            const size_t retCode = it->callback(*editor, command, it->opaque);
+            editor->LogMessage(LogLevel::Trace, "Command %.*s exited with code %zu", 
+                (int)command.Size(), command.Begin(), retCode);
+
             return;
         }
+
+        editor->LogMessage(LogLevel::Error, "Not a command: %.*s", (int)command.Size(), command.Begin());
     }
 
-    size_t CommandProcessor::PeekInputBuffer(sl::Span<char> buffer) const
+    size_t CommandEngine::PeekInputBuffer(sl::Span<char> buffer) const
     {
         const size_t length = sl::Min(buffer.Size(), inputLength);
         for (size_t i = 0; i < length; i++)
@@ -96,11 +127,25 @@ namespace Centi::Editor
         return length;
     }
 
-    InputMode CommandProcessor::Mode(sl::Opt<InputMode> set)
+    sl::StringSpan CommandEngine::PeekCommandBuffer() const
+    {
+        return sl::StringSpan(cmdInputBuffer, cmdInputLength + 1);
+    }
+
+    InputMode CommandEngine::Mode(sl::Opt<InputMode> set)
     {
         const auto ret = mode;
         if (set.HasValue())
+        {
             mode = *set;
+
+            if (mode == InputMode::Command)
+            {
+                cmdInputBuffer[0] = ':';
+                cmdInputLength = 0;
+            }
+            editor->RedrawMessageBar();
+        }
 
         return ret;
     }

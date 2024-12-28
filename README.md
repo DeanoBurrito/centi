@@ -17,3 +17,8 @@ Centi is my personal experiment with writing a terminal-based text editor, loose
 - [ ] File browser
 - [ ] Git integration
 - [ ] LSP support
+
+## Resources Used
+- https://viewsourcecode.org/snaptoken/kilo/index.html
+- https://github.com/charlesnicholson/nanoprintf
+- headers under `include/sl` are from my c++ support library 'syslib', ripped from https://github.com/DeanoBurrito/northport

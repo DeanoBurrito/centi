@@ -53,11 +53,12 @@ namespace Centi::Editor
     class Editor
     {
     private:
-        bool shouldQuit;
         sl::Vector2u displaySize;
-        CommandProcessor cmdProcessor;
+        CommandEngine cmdEngine;
         EditorWindow* rootWindow;
         EditorWindow* focusedWindow;
+        bool shouldQuit;
+        bool redrawMessageBar;
 
         sl::FwdList<EditorWorkItem, &EditorWorkItem::queueHook> workItems;
         sl::FwdList<EditorMessage, &EditorMessage::queueHook> logs;
@@ -87,9 +88,12 @@ namespace Centi::Editor
         void MoveCursor(MoveDirection dir, size_t count);
 
         inline void RunCommand(sl::StringSpan command)
-        { cmdProcessor.DoCommand(command); }
+        { cmdEngine.DoCommand(command); }
 
         inline InputMode Mode(sl::Opt<InputMode> set = {})
-        { return cmdProcessor.Mode(set); }
+        { return cmdEngine.Mode(set); }
+
+        inline void RedrawMessageBar()
+        { redrawMessageBar = true; }
     };
 }
