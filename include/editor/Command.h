@@ -48,7 +48,7 @@ namespace Centi::Editor
     {
     private:
         Editor* editor;
-        sl::List<BindingHandler, &BindingHandler::listHook> bindings[static_cast<size_t>(EditorMode::Count)];
+        sl::List<BindingHandler, &BindingHandler::listHook> bindings[static_cast<size_t>(InputMode::Count)];
         sl::List<CommandHandler, &CommandHandler::listHook> commands;
 
         InputMode mode = InputMode::Normal;
@@ -60,7 +60,7 @@ namespace Centi::Editor
         { editor = &ed; }
 
         void AddBuiltins();
-        bool AddBinding(EditorMode mode, BindingHandler* handler);
+        bool AddBinding(InputMode mode, BindingHandler* handler);
         bool AddCommand(CommandHandler* handler);
 
         void Process();

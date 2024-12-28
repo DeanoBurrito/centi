@@ -11,14 +11,12 @@ enum class LogLevel
     Trace,
 };
 
-enum class EditorMode
+enum class MoveDirection
 {
-    Normal,
-    Insert,
-    Command,
-    Visual,
-
-    Count
+    Up,
+    Down,
+    Left,
+    Right,
 };
 
 using TextChar = uint32_t; //full-fat utf32 form

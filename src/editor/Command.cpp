@@ -5,7 +5,7 @@
 
 namespace Centi::Editor
 {
-    bool CommandProcessor::AddBinding(EditorMode mode, BindingHandler* handler)
+    bool CommandProcessor::AddBinding(InputMode mode, BindingHandler* handler)
     {
         //TODO: normalize tag chars + convert keys like delete (which becomes an escape seq)
         auto& list = bindings[static_cast<size_t>(mode)];

@@ -1,5 +1,6 @@
 #include <Host.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
@@ -17,6 +18,17 @@ namespace Centi
         if (MAP_FAILED == ret)
             return nullptr;
         return ret;
+    }
+
+    void* HostGeneralAlloc(size_t length)
+    {
+        return malloc(length);
+    }
+
+    void HostGeneralFree(void* ptr, size_t length)
+    {
+        (void)length;
+        free(ptr);
     }
 
     struct termios defaultInControl;

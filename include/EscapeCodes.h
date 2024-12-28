@@ -27,3 +27,6 @@
 #define CSI_CURSOR_SET_POS(x, y) CSI_CURSOR_SET_POS_(#x, #y)
 #define CSI_ERASE(n) CSI_ERASE_(#n)
 #define CSI_ERASE_LINE(n) CSI_ERASE_LINE_(#n)
+
+#define CSI_SHOW_CURSOR CSI_INDUCER "?25h"
+#define CSI_HIDE_CURSOR CSI_INDUCER "?25l"

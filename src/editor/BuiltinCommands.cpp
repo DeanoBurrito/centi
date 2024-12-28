@@ -6,36 +6,44 @@ namespace Centi::Editor
     BindingHandler builtinBindsNormal[] = 
     {
         {
-            .callback = [](Editor& editor) 
-            { 
-                editor.RunCommand("quit"); 
-            },
+            .callback = [](Editor& editor) { editor.RunCommand("quit"); },
             .tag = "q",
             .tagLength = 1
         },
         {
-            .callback = [](Editor& editor) 
-            { 
-                editor.Mode(InputMode::Command); 
-            },
+            .callback = [](Editor& editor) { editor.Mode(InputMode::Command); },
             .tag = ":",
             .tagLength = 1
         },
         {
-            .callback = [](Editor& editor) 
-            { 
-                editor.Mode(InputMode::Insert); 
-            },
+            .callback = [](Editor& editor) { editor.Mode(InputMode::Insert); },
             .tag = "i",
             .tagLength = 1
         },
         {
-            .callback = [](Editor& editor) 
-            { 
-                editor.Mode(InputMode::Visual); 
-            },
+            .callback = [](Editor& editor) { editor.Mode(InputMode::Visual); },
             .tag = "v",
-            .tagLength = 1,
+            .tagLength = 1
+        },
+        {
+            .callback = [](Editor& editor) { editor.MoveCursor(MoveDirection::Up, 1); },
+            .tag = "k",
+            .tagLength = 1
+        },
+        {
+            .callback = [](Editor& editor) { editor.MoveCursor(MoveDirection::Down, 1); },
+            .tag = "j",
+            .tagLength = 1
+        },
+        {
+            .callback = [](Editor& editor) { editor.MoveCursor(MoveDirection::Left, 1); },
+            .tag = "h",
+            .tagLength = 1
+        },
+        {
+            .callback = [](Editor& editor) { editor.MoveCursor(MoveDirection::Right, 1); },
+            .tag = "l",
+            .tagLength = 1
         },
     };
 
@@ -72,19 +80,19 @@ namespace Centi::Editor
     {
         constexpr size_t normalCount = sizeof(builtinBindsNormal) / sizeof(BindingHandler);
         for (size_t i = 0; i < normalCount; i++)
-            AddBinding(EditorMode::Normal, &builtinBindsNormal[i]);
+            AddBinding(InputMode::Normal, &builtinBindsNormal[i]);
 
         constexpr size_t insertCount = sizeof(builtinBindsInsert) / sizeof(BindingHandler);
         for (size_t i = 0; i < insertCount; i++)
-            AddBinding(EditorMode::Insert, &builtinBindsInsert[i]);
+            AddBinding(InputMode::Insert, &builtinBindsInsert[i]);
 
         constexpr size_t commandCount = sizeof(builtinBindsCommand) / sizeof(BindingHandler);
         for (size_t i = 0; i < commandCount; i++)
-            AddBinding(EditorMode::Command, &builtinBindsCommand[i]);
+            AddBinding(InputMode::Command, &builtinBindsCommand[i]);
 
         constexpr size_t visualCount = sizeof(builtinBindsVisual) / sizeof(BindingHandler);
         for (size_t i = 0; i < visualCount; i++)
-            AddBinding(EditorMode::Visual, &builtinBindsVisual[i]);
+            AddBinding(InputMode::Visual, &builtinBindsVisual[i]);
 
         editor->LogMessage(LogLevel::Info, "Builtin bindings added: %zu normal, %zu insert, %zu command, %zu visual",
             normalCount, insertCount, commandCount, visualCount);

@@ -26,4 +26,19 @@ namespace Centi
     bool HostGetTerminalSize(unsigned long& width, unsigned long& height);
     sl::Opt<char> HostGetChar();
     sl::Opt<size_t> HostPutChars(sl::StringSpan chars);
+
+    template<typename T>
+    inline T* HostNew()
+    {
+        void* ptr = HostGeneralAlloc(sizeof(T));
+        if (ptr != nullptr)
+            return new(ptr) T();
+        return nullptr;
+    }
+
+    template<typename T>
+    inline void HostDelete(T* ptr)
+    {
+        HostGeneralFree(static_cast<void*>(ptr), sizeof(T));
+    }
 }
