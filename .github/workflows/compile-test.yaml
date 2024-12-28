@@ -1,0 +1,19 @@
+name: Build Tests
+
+on: [ push, pull_request ]
+
+jobs:
+  run-build-tests:
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        path: repo
+    - name: Compile
+      run: cd repo; make all
