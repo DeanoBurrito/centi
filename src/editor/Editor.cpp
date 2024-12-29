@@ -91,7 +91,11 @@ namespace Centi::Editor
 
                 if (bufferRow == window->buffer->rows.End())
                     lineBuff[lineBuffLen++] = '~';
-                //TODO: copy segment data (or SSO) to line buffer and render
+                else
+                {
+                    lineBuffLen += ReadBuffer(window->buffer, window->scroll, 
+                        { lineBuff + lineBuffLen, MaxRowRenderLength - lineBuffLen });
+                }
 
                 HostPutChars({ lineBuff, lineBuffLen });
             }
@@ -99,17 +103,46 @@ namespace Centi::Editor
 
         if (window->dirty.cursor)
         {
+            constexpr const char FormatStr[] = CSI_CURSOR_SET_POS_("%lu", "%lu") \
+                CSI_INDUCER "%.*s;%.*sm%c" CSI_SGR_RESET;
             window->dirty.cursor = false;
             window->dirty.status = true;
+
+            char cursorChar = ' ';
+
+            ReadBuffer(window->buffer, window->dirty.oldCursor, { &cursorChar, 1 });
+            lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, FormatStr, 
+                window->dirty.oldCursor.y + 1, 
+                window->dirty.oldCursor.x + 1, 
+                (int)cfg.theme.miscText.fg.Size(),
+                cfg.theme.miscText.fg.Begin(), 
+                (int)cfg.theme.miscText.bg.Size(), 
+                cfg.theme.miscText.bg.Begin(),
+                cursorChar);
+            HostPutChars({ lineBuff, lineBuffLen });
+
+            ReadBuffer(window->buffer, window->cursor, { &cursorChar, 1 });
+            lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, FormatStr,
+                window->cursor.y + 1,
+                window->cursor.x + 1,
+                (int)cfg.theme.cursor.fg.Size(),
+                cfg.theme.cursor.fg.Begin(),
+                (int)cfg.theme.cursor.bg.Size(),
+                cfg.theme.cursor.bg.Begin(),
+                cursorChar);
+            HostPutChars({ lineBuff, lineBuffLen });
+            window->dirty.oldCursor = window->cursor;
         }
 
         if (window->dirty.status)
         {
-            constexpr const char FormatStr[] = CSI_CURSOR_SET_POS_("0", "%lu") CSI_ERASE_LINE(2) "cursor %lu:%lu";
+            constexpr const char FormatStr[] = CSI_CURSOR_SET_POS_("0", "%lu") CSI_ERASE_LINE(2) 
+                "cursor %lu:%lu, scroll %lu:%lu";
             window->dirty.status = false;
 
             lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, FormatStr,
-                window->size.y, window->cursor.y, window->cursor.x);
+                window->size.y, window->cursor.y, window->cursor.x,
+                window->scroll.y, window->scroll.x);
             HostPutChars({ lineBuff, lineBuffLen });
         }
     }
@@ -134,18 +167,20 @@ namespace Centi::Editor
     {
         shouldQuit = false;
 
+        SetDefaultConfig(cfg);
         cmdEngine.BindEditor(*this);
         cmdEngine.AddBuiltins();
 
         UpdateDisplaySpec();
         
-        rootWindow = focusedWindow = new EditorWindow();
-
-        rootWindow->buffer = CreateBuffer({}, true);
+        rootWindow = new EditorWindow();
+        rootWindow->buffer = CreateBuffer(true);
         rootWindow->size = displaySize;
         rootWindow->size.y--; //leave space for message bar
         rootWindow->dirty.cursor = true;
         rootWindow->dirty.scroll = true;
+
+        focusedWindow = rootWindow;
         dirtyWindows.PushBack(rootWindow);
     }
 
@@ -221,14 +256,25 @@ namespace Centi::Editor
         switch (dir)
         {
         case MoveDirection::Up: 
-            focusedWindow->cursor.y = sl::Clamp(focusedWindow->cursor.y - count, 0ul, focusedWindow->size.y - 1);
+            count = sl::Min(count, focusedWindow->cursor.y);
+            if (focusedWindow->cursor.y == focusedWindow->scroll.y)
+                ScrollWindow(*focusedWindow, dir, count);
+
+            focusedWindow->cursor.y -= count;
             break;
+
         case MoveDirection::Down: 
             focusedWindow->cursor.y = sl::Clamp(focusedWindow->cursor.y + count, 0ul, focusedWindow->size.y - 1);
             break;
+
         case MoveDirection::Left: 
-            focusedWindow->cursor.x = sl::Clamp(focusedWindow->cursor.x - count, 0ul, focusedWindow->size.x - 1);
+            count = sl::Min(count, focusedWindow->cursor.x);
+
+            if (focusedWindow->cursor.x == focusedWindow->scroll.x)
+                ScrollWindow(*focusedWindow, dir, count);
+            focusedWindow->cursor.x -= count;
             break;
+
         case MoveDirection::Right: 
             focusedWindow->cursor.x = sl::Clamp(focusedWindow->cursor.x + count, 0ul, focusedWindow->size.x - 1);
             break;
@@ -237,4 +283,7 @@ namespace Centi::Editor
         focusedWindow->dirty.cursor = true;
         RedrawWindow(focusedWindow);
     }
+
+    void Editor::ScrollWindow(EditorWindow& window, MoveDirection dir, size_t count)
+    {}
 }

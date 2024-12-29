@@ -30,3 +30,8 @@
 
 #define CSI_SHOW_CURSOR CSI_INDUCER "?25h"
 #define CSI_HIDE_CURSOR CSI_INDUCER "?25l"
+
+#define CSI_SGR_SET1(a) CSI_INDUCER a "m"
+#define CSI_SGR_SET2(a, b) CSI_INDUCER a ";" b "m"
+#define CSI_SGR_SET3(a, b) CSI_INDUCER a ";" b ";" c "m"
+#define CSI_SGR_RESET CSI_SGR_SET1("0")

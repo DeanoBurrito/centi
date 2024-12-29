@@ -3,6 +3,7 @@
 #include <Types.h>
 #include <editor/Command.h>
 #include <editor/Buffer.h>
+#include <editor/Config.h>
 #include <Vectors.h>
 
 namespace Centi::Editor
@@ -47,12 +48,15 @@ namespace Centi::Editor
             bool status;
             bool cursor;
             bool scroll;
+
+            sl::Vector2u oldCursor;
         } dirty;
     };
 
     class Editor
     {
     private:
+        Config cfg;
         sl::Vector2u displaySize;
         CommandEngine cmdEngine;
         EditorWindow* rootWindow;
@@ -86,6 +90,7 @@ namespace Centi::Editor
 
         void RedrawWindow(EditorWindow* window);
         void MoveCursor(MoveDirection dir, size_t count);
+        void ScrollWindow(EditorWindow& window, MoveDirection dir, size_t count);
 
         inline void RunCommand(sl::StringSpan command)
         { cmdEngine.DoCommand(command); }
