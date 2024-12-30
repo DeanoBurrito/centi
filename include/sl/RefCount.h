@@ -72,6 +72,13 @@ namespace sl
                 WhenZero(ptr);
             ptr = nullptr;
         }
+        
+        T* Drop()
+        {
+            T* ret = ptr;
+            ptr = nullptr;
+            return ret;
+        }
 
         constexpr bool Valid() const
         { return ptr != nullptr; }

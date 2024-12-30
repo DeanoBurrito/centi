@@ -6,60 +6,35 @@
 
 namespace Centi::Editor
 {
-    constexpr size_t SegmentExpansionLength = 4 * GiB;
-
     sl::Atomic<size_t> bufferIdAlloc {};
     sl::List<Buffer, &Buffer::listHook> allBuffers;
 
-    sl::SpinLock freeSegsLock;
-    sl::List<BufferSegment, &BufferSegment::rowHook> freeSegs {};
-
-    static BufferSegment* AllocSegment()
+    static void DestroyBufferRows(Buffer* buffer)
     {
-        sl::ScopedLock scopeLock(freeSegsLock);
-
-        if (freeSegs.Empty())
+        for (auto row = buffer->rows.PopFront(); row != nullptr; row = buffer->rows.PopFront())
         {
-            void* newMem = HostMmapAnon(SegmentExpansionLength);
-            if (newMem == nullptr)
-                return nullptr;
-
-            BufferSegment* header = new(newMem) BufferSegment();
-            header->count = SegmentExpansionLength / sizeof(BufferSegment);
-            freeSegs.PushFront(header);
+            HostGeneralFree(row->data.Begin(), row->data.Size());
+            HostDelete(row);
         }
-
-        BufferSegment* seg = freeSegs.PopFront();
-        if (seg->count > 1)
-        {
-            BufferSegment* latest = new(seg + 1) BufferSegment();
-            latest->count = seg->count - 1;
-            freeSegs.PushFront(latest);
-        }
-
-        return seg;
     }
 
-    static void FreeSegment(BufferSegment* seg)
+    static bool ReallyDestroyBuffer(Buffer* buffer, bool force)
     {
-        if (seg == nullptr)
-            return;
-
-        sl::ScopedLock scopeLock(freeSegsLock);
-        freeSegs.PushFront(seg);
+        return true;
     }
 
     void CleanupBuffer(Buffer* buffer)
     {
-        DestroyBuffer(buffer, false);
+        ReallyDestroyBuffer(buffer, false);
     }
 
-    BufferRef CreateBuffer(sl::StringSpan initContent, bool writable)
+    BufferRef CreateBuffer(bool writable)
     {
         BufferRef buffer = HostNew<Buffer>();
         buffer->writable = writable;
         buffer->dirty = false;
         buffer->id = bufferIdAlloc++;
+
         allBuffers.PushBack(&*buffer);
 
         return buffer;
@@ -70,8 +45,7 @@ namespace Centi::Editor
         if (!buffer.Valid())
             return false;
 
-        //TODO: destroy segments and then finally buffer
-        return true;
+        return ReallyDestroyBuffer(buffer.Drop(), force);
     }
 
     size_t ReadBuffer(BufferRef buffer, sl::Vector2u offset, sl::Span<char> into)
@@ -85,27 +59,41 @@ namespace Centi::Editor
         if (row == buffer->rows.End())
             return 0;
 
-        size_t written = 0;
-        if (row->length <= BufferShortStoreLength)
+        const size_t copyLength = sl::Min(into.Size(), row->data.Size() - offset.x);
+        memcpy(into.Begin(), row->data.Begin() + offset.x, copyLength);
+
+        return copyLength;
+    }
+
+    void SetBuffer(BufferRef buffer, sl::StringSpan contents)
+    {
+        if (!buffer.Valid())
+            return;
+
+        DestroyBufferRows(&*buffer);
+
+        size_t rowStart = 0;
+        for (size_t i = 0; i < contents.Size(); i++)
         {
-            if (row->length > offset.x)
+            if (contents[i] != '\n')
+                continue;
+
+            BufferRow* row = HostNew<BufferRow>();
+            if (row == nullptr)
+                return;
+
+            char* rowBuff = static_cast<char*>(HostGeneralAlloc(i - rowStart));
+            if (rowBuff == nullptr)
             {
-                written = row->length - offset.x;
-                memcpy(into.Begin(), row->shortStore + offset.x, written);
+                HostDelete(row);
+                return;
             }
-            return written;
+
+            memcpy(rowBuff, &contents[rowStart], i - rowStart);
+            row->realDataLength = i - rowStart;
+            row->data = sl::Span<char>(rowBuff, i - rowStart);
+            buffer->rows.PushBack(row);
+            rowStart = i + 1;
         }
-
-        const size_t totalWriteLength = sl::Min(into.Size(), row->length - offset.x);
-        for (auto seg = row->segments.Begin(); seg != row->segments.End(); ++seg)
-        {
-            const size_t copyLength = sl::Min(totalWriteLength - written, BufferSegmentLength - offset.x);
-
-            memcpy(&into[written], seg->text + offset.x, copyLength);
-            written += copyLength;
-            offset.x = 0;
-        }
-
-        return written;
     }
 }

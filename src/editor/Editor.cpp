@@ -20,11 +20,13 @@ namespace Centi::Editor
     {
         for (size_t i = 0; i < limit; i++)
         {
-            auto item = workItems.PopFront();
+            workQueueLock.Lock();
+            auto item = workQueue.PopFront();
+            workQueueLock.Unlock();
+
             if (item == nullptr)
                 return;
-
-            item->callback(item, this);
+            item->callback(item, *this);
         }
     }
 
@@ -81,21 +83,17 @@ namespace Centi::Editor
             constexpr const char HeaderStr[] = CSI_CURSOR_SET_POS_("%lu", "%lu") CSI_ERASE_LINE(2);
             window->dirty.scroll = false;
 
-            auto bufferRow = window->buffer->rows.Begin();
-            for (size_t i = 0; i < window->scroll.y; i++)
-                ++bufferRow;
-
             for (size_t i = 0; i < window->size.y - 1; i++)
             {
-                lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, HeaderStr, i, 0ul);
-
-                if (bufferRow == window->buffer->rows.End())
+                lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, HeaderStr, i + 1, 0ul);
+                const size_t lineLen = ReadBuffer(window->buffer, 
+                    { window->scroll.x, window->scroll.y + i },
+                    { lineBuff + lineBuffLen, MaxRowRenderLength - lineBuffLen });
+                
+                if (lineLen == 0)
                     lineBuff[lineBuffLen++] = '~';
                 else
-                {
-                    lineBuffLen += ReadBuffer(window->buffer, window->scroll, 
-                        { lineBuff + lineBuffLen, MaxRowRenderLength - lineBuffLen });
-                }
+                    lineBuffLen += lineLen;
 
                 HostPutChars({ lineBuff, lineBuffLen });
             }
@@ -121,6 +119,7 @@ namespace Centi::Editor
                 cursorChar);
             HostPutChars({ lineBuff, lineBuffLen });
 
+            cursorChar = ' ';
             ReadBuffer(window->buffer, window->cursor, { &cursorChar, 1 });
             lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, FormatStr,
                 window->cursor.y + 1,
@@ -174,14 +173,10 @@ namespace Centi::Editor
         UpdateDisplaySpec();
         
         rootWindow = new EditorWindow();
-        rootWindow->buffer = CreateBuffer(true);
+        focusedWindow = rootWindow;
         rootWindow->size = displaySize;
         rootWindow->size.y--; //leave space for message bar
-        rootWindow->dirty.cursor = true;
-        rootWindow->dirty.scroll = true;
-
-        focusedWindow = rootWindow;
-        dirtyWindows.PushBack(rootWindow);
+        SetBuffer(*rootWindow, CreateBuffer(true));
     }
 
     Editor::~Editor()
@@ -237,15 +232,22 @@ namespace Centi::Editor
         return true;
     }
 
-    void Editor::RedrawWindow(EditorWindow* window)
+    void Editor::QueueWorkItem(EditorWorkItem* item, bool async)
     {
-        if (window == nullptr)
+        (void)async;
+        if (item == nullptr)
             return;
 
-        if (window->dirty.queued)
+        sl::ScopedLock scopeLock(workQueueLock);
+        workQueue.PushBack(item);
+    }
+
+    void Editor::RedrawWindow(EditorWindow& window)
+    {
+        if (window.dirty.queued)
             return;
-        window->dirty.queued = true;
-        dirtyWindows.PushBack(window);
+        window.dirty.queued = true;
+        dirtyWindows.PushBack(&window);
     }
 
     void Editor::MoveCursor(MoveDirection dir, size_t count)
@@ -281,9 +283,21 @@ namespace Centi::Editor
         }
 
         focusedWindow->dirty.cursor = true;
-        RedrawWindow(focusedWindow);
+        RedrawWindow(*focusedWindow);
     }
 
     void Editor::ScrollWindow(EditorWindow& window, MoveDirection dir, size_t count)
     {}
+
+    void Editor::SetBuffer(EditorWindow& window, BufferRef buffer)
+    {
+        window.buffer = buffer;
+        window.scroll = { 0, 0 };
+        window.cursor = { 0, 0 };
+        window.dirty.scroll = true;
+        window.dirty.cursor = true;
+        window.dirty.oldCursor = { 0, 0 };
+
+        RedrawWindow(window);
+    }
 }

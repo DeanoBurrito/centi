@@ -1,15 +1,25 @@
 #include <editor/Command.h>
 #include <editor/Editor.h>
+#include <Host.h>
 
 namespace Centi::Editor
 {
+    static void FinishEditCommand(EditorWorkItem* item, Editor& editor)
+    {
+        BufferRef buff = CreateBuffer(true);
+        if (!buff.Valid())
+            return;
+
+        sl::StringSpan file(static_cast<const char*>(item->args[0]), reinterpret_cast<size_t>(item->args[1]));
+        SetBuffer(buff, file);
+        HostCloseFileForReading(file);
+
+        editor.SetBuffer(editor.FocusedWindow(), buff);
+        editor.LogMessage(LogLevel::Info, "opened file");
+    }
+
     BindingHandler builtinBindsNormal[] = 
     {
-        {
-            .callback = [](Editor& editor) { editor.RunCommand("quit"); },
-            .tag = "q",
-            .tagLength = 1
-        },
         {
             .callback = [](Editor& editor) { editor.Mode(InputMode::Command); },
             .tag = ":",
@@ -96,8 +106,22 @@ namespace Centi::Editor
         {
             .callback = [](Editor& editor, sl::StringSpan args, void* opaque) -> size_t
             {
-                (void)args;
                 (void)opaque;
+
+                while (!args.Empty() && args[0] != ' ')
+                    args = args.Subspan(1, args.Size() - 1);
+                args = args.Subspan(1, args.Size() - 1);
+
+                EditorWorkItem* workItem = HostNew<EditorWorkItem>();
+                if (workItem == nullptr)
+                    return 1;
+
+                workItem->callback = FinishEditCommand;
+                auto file = HostOpenFileForReading(args); //TODO: would be nicer to make this call in the async function
+                workItem->args[0] = const_cast<char*>(file.Begin());
+                workItem->args[1] = reinterpret_cast<void*>(file.Size());
+
+                editor.QueueWorkItem(workItem, true);
                 return 0;
             },
             .opaque = nullptr,

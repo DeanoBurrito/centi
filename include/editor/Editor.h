@@ -5,6 +5,7 @@
 #include <editor/Buffer.h>
 #include <editor/Config.h>
 #include <Vectors.h>
+#include <Locks.h>
 
 namespace Centi::Editor
 {
@@ -14,7 +15,7 @@ namespace Centi::Editor
     struct EditorWorkItem;
     class Editor;
 
-    using EditorWorkCallback = void (*)(EditorWorkItem* item, Editor* editor);
+    using EditorWorkCallback = void (*)(EditorWorkItem* item, Editor& editor);
 
     struct EditorWorkItem
     {
@@ -64,7 +65,8 @@ namespace Centi::Editor
         bool shouldQuit;
         bool redrawMessageBar;
 
-        sl::FwdList<EditorWorkItem, &EditorWorkItem::queueHook> workItems;
+        sl::SpinLock workQueueLock;
+        sl::FwdList<EditorWorkItem, &EditorWorkItem::queueHook> workQueue;
         sl::FwdList<EditorMessage, &EditorMessage::queueHook> logs;
         sl::FwdList<EditorWindow, &EditorWindow::dirtyList> dirtyWindows;
         
@@ -85,12 +87,15 @@ namespace Centi::Editor
 
         void Run();
         void Quit();
+
         [[gnu::format(printf, 3, 4)]]
         bool LogMessage(LogLevel level, const char* format, ...);
+        void QueueWorkItem(EditorWorkItem* item, bool async);
 
-        void RedrawWindow(EditorWindow* window);
+        void RedrawWindow(EditorWindow& window);
         void MoveCursor(MoveDirection dir, size_t count);
         void ScrollWindow(EditorWindow& window, MoveDirection dir, size_t count);
+        void SetBuffer(EditorWindow& window, BufferRef buffer);
 
         inline void RunCommand(sl::StringSpan command)
         { cmdEngine.DoCommand(command); }
@@ -100,5 +105,8 @@ namespace Centi::Editor
 
         inline void RedrawMessageBar()
         { redrawMessageBar = true; }
+
+        inline EditorWindow& FocusedWindow()
+        { return *focusedWindow; }
     };
 }

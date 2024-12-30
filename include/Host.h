@@ -18,9 +18,12 @@ extern "C"
 
 namespace Centi
 {
-    void* HostMmapAnon(size_t length);
     void* HostGeneralAlloc(size_t length);
     void HostGeneralFree(void* ptr, size_t length);
+
+    sl::StringSpan HostOpenFileForReading(sl::StringSpan filename);
+    void HostCloseFileForReading(sl::StringSpan file);
+    bool HostWriteFile(sl::StringSpan filename, sl::StringSpan content);
 
     bool HostSetupTerminal();
     bool HostResetTerminal();

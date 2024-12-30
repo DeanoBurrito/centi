@@ -108,14 +108,20 @@ namespace Centi::Editor
         if (command[command.Size() - 1] == 0)
             command = command.Subspan(0, command.Size() - 1);
 
+        editor->LogMessage(LogLevel::Trace, "Running command %.*s",
+            (int)command.Size(), command.Begin());
+
+        sl::StringSpan commandLine = command;
+        const void* firstSpace = memchr(command.Begin(), ' ', command.Size());
+        if (firstSpace != nullptr)
+            command = command.Subspan(0, (uintptr_t)firstSpace - (uintptr_t)command.Begin());
+
         for (auto it = commands.Begin(); it != commands.End(); ++it)
         {
             if (command != it->tag)
                 continue;
 
-            editor->LogMessage(LogLevel::Trace, "Running command %.*s", (int)command.Size(), 
-                command.Begin());
-            const size_t retCode = it->callback(*editor, command, it->opaque);
+            const size_t retCode = it->callback(*editor, commandLine, it->opaque);
             editor->LogMessage(LogLevel::Trace, "Command %.*s exited with code %zu", 
                 (int)command.Size(), command.Begin(), retCode);
 
