@@ -110,8 +110,8 @@ namespace Centi::Editor
 
             ReadBuffer(window->buffer, window->dirty.oldCursor, { &cursorChar, 1 });
             lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, FormatStr, 
-                window->dirty.oldCursor.y + 1, 
-                window->dirty.oldCursor.x + 1, 
+                window->dirty.oldCursor.y + 1 - window->scroll.y, 
+                window->dirty.oldCursor.x + 1 - window->scroll.x, 
                 (int)cfg.theme.miscText.fg.Size(),
                 cfg.theme.miscText.fg.Begin(), 
                 (int)cfg.theme.miscText.bg.Size(), 
@@ -119,11 +119,11 @@ namespace Centi::Editor
                 cursorChar);
             HostPutChars({ lineBuff, lineBuffLen });
 
-            cursorChar = ' ';
-            ReadBuffer(window->buffer, window->cursor, { &cursorChar, 1 });
+            if (ReadBuffer(window->buffer, window->cursor, { &cursorChar, 1 }) == 0)
+                cursorChar = ' ';
             lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, FormatStr,
-                window->cursor.y + 1,
-                window->cursor.x + 1,
+                window->cursor.y + 1 - window->scroll.y,
+                window->cursor.x + 1 - window->scroll.x,
                 (int)cfg.theme.cursor.fg.Size(),
                 cfg.theme.cursor.fg.Begin(),
                 (int)cfg.theme.cursor.bg.Size(),
@@ -140,7 +140,7 @@ namespace Centi::Editor
             window->dirty.status = false;
 
             lineBuffLen = npf_snprintf(lineBuff, MaxRowRenderLength, FormatStr,
-                window->size.y, window->cursor.y, window->cursor.x,
+                window->size.y + 1, window->cursor.y, window->cursor.x,
                 window->scroll.y, window->scroll.x);
             HostPutChars({ lineBuff, lineBuffLen });
         }
@@ -175,7 +175,7 @@ namespace Centi::Editor
         rootWindow = new EditorWindow();
         focusedWindow = rootWindow;
         rootWindow->size = displaySize;
-        rootWindow->size.y--; //leave space for message bar
+        rootWindow->size.y -= 2; //leave space for message bar + window status bar (not counted towards window size)
         SetBuffer(*rootWindow, CreateBuffer(true));
     }
 
@@ -266,7 +266,10 @@ namespace Centi::Editor
             break;
 
         case MoveDirection::Down: 
-            focusedWindow->cursor.y = sl::Clamp(focusedWindow->cursor.y + count, 0ul, focusedWindow->size.y - 1);
+            focusedWindow->cursor.y += count;
+
+            if (focusedWindow->cursor.y - focusedWindow->scroll.y >= focusedWindow->size.y)
+                ScrollWindow(*focusedWindow, dir, count);
             break;
 
         case MoveDirection::Left: 
@@ -278,7 +281,10 @@ namespace Centi::Editor
             break;
 
         case MoveDirection::Right: 
-            focusedWindow->cursor.x = sl::Clamp(focusedWindow->cursor.x + count, 0ul, focusedWindow->size.x - 1);
+            focusedWindow->cursor.x += count;
+
+            if (focusedWindow->cursor.x + focusedWindow->scroll.x >= focusedWindow->size.x)
+                ScrollWindow(*focusedWindow, dir, count);
             break;
         }
 
@@ -287,7 +293,37 @@ namespace Centi::Editor
     }
 
     void Editor::ScrollWindow(EditorWindow& window, MoveDirection dir, size_t count)
-    {}
+    {
+        window.dirty.scroll = true;
+
+        const size_t bufferRows = window.buffer.Valid() ? window.buffer->rowCount : 0;
+        switch (dir)
+        {
+        case MoveDirection::Up:
+            if (count > window.scroll.y)
+                window.scroll.y = 0;
+            else
+                window.scroll.y -= count;
+            break;
+
+        case MoveDirection::Down:
+            window.scroll.y = sl::Min(window.scroll.y + count, bufferRows);
+            break;
+
+        case MoveDirection::Left:
+            if (count > window.scroll.x)
+                window.scroll.x = 0;
+            else
+                window.scroll.x -= count;
+            break;
+
+        case MoveDirection::Right:
+            window.scroll.x = sl::Min(window.scroll.x + count, bufferRows);
+            break;
+        }
+
+        RedrawWindow(window);
+    }
 
     void Editor::SetBuffer(EditorWindow& window, BufferRef buffer)
     {

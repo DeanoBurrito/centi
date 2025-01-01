@@ -21,6 +21,7 @@ namespace Centi::Editor
         sl::RefCount refCount;
         sl::List<BufferRow, &BufferRow::rowsListHook> rows;
         size_t id;
+        size_t rowCount;
         bool writable;
         bool dirty;
     };

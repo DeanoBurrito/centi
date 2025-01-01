@@ -58,6 +58,8 @@ namespace Centi::Editor
             row = ++row;
         if (row == buffer->rows.End())
             return 0;
+        if (offset.x >= row->data.Size())
+            return 0;
 
         const size_t copyLength = sl::Min(into.Size(), row->data.Size() - offset.x);
         memcpy(into.Begin(), row->data.Begin() + offset.x, copyLength);
